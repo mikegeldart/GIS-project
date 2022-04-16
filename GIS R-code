@@ -1,0 +1,119 @@
+rm(list=ls())
+
+#install sf
+install.packages("sf")
+library(sf)
+require(sf)
+
+#require dplyr
+require(dplyr)
+
+#require ggplot2
+require(ggplot2)
+
+#view list of generic functions
+methods(class = 'sf')
+
+#install the rinat package to extract off iNaturalist
+install.packages("rinat")
+library(rinat)
+require(rinat)
+
+#Call the data directly from iNat and set bounds of map
+pc <- get_inat_obs(taxon_name = "Haliotis midae",
+                   bounds = c(-90, 10 , -10, 60),
+                   maxresults = 1000)
+
+##Nb- bounds were predetermined as it is a south african species
+
+#View the first few rows of data
+head(pc)
+
+#Filter returned observations by a range of column attribute criteria
+pc <- pc %>% filter(positional_accuracy<46 & 
+                      latitude<0 &
+                      !is.na(latitude) &
+                      captive_cultivated == "false" &
+                      quality_grade == "research")
+
+class(pc)
+
+#Make the dataframe a spatial object of class = "sf"
+pc <- st_as_sf(pc, coords = c("longitude", "latitude"), crs = 4326)
+
+
+#look at the names of new "geometry" column
+names(pc)
+#
+
+#plot the geographical coordinates
+ggplot() + geom_sf(data=pc)
+####
+
+#install package rosm
+install.packages("rosm")
+library(rosm)
+require(rosm)
+
+#install package ggspatial
+
+install.packages("ggspatial")
+library(ggspatial)
+require(ggspatial)
+
+#add a baselayer from open street maps
+
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=pc)
+
+#########making a more attractive map###########
+
+
+#group the abalone by their common name
+pc %>% group_by(common_name) %>% summarise(n())
+
+# Install package wesanderson
+install.packages("wesanderson")
+library(wesanderson)
+require(wesanderson)
+
+#create a colour pallete
+
+pal <- wes_palette("BottleRocket1", 1, type = "continuous")
+
+#require ggplot2
+require(ggplot2)
+
+#plot the map with a added legend of common name perlemoen
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=pc, aes(col = common_name)) +
+  scale_colour_manual(values = pal)
+
+
+######################################################
+
+######creating an interactive map#####################
+
+#download package leaflet
+install.packages("leaflet")
+library(leaflet)
+require(leaflet)
+
+#download package htmltool
+install.packages("htmltools")
+library(htmltools)
+require(htmltools)
+
+leaflet() %>%
+  # Add default OpenStreetMap map tiles
+  addTiles(group = "Default") %>%  
+  # Add points
+  addCircleMarkers(data = pc,
+                   group = "Haliotis midae",
+                   radius = 2.5, 
+                   color = "red")
+##################
+#finish 
+###################
