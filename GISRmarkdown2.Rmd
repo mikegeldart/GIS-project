@@ -1,0 +1,327 @@
+---
+title: "GIS project"
+author: "Michael Geldart GLDMIC023"
+date: "15/04/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+![figure 1: Image of the Cape Abalone "perlemoen" (*Haliotis midae*)](images/haliotis.jpg "Haliotis midae")
+
+### **My project will attempt to map the South African distribution of Perlemoen, which is the South African Abalone *Haliotis midae*.**
+
+<br>
+
+I originally wanted to map the locations of abalone farms in South Africa, however that information is difficult to find because of Abalone poaching in South Africa and the trade secrets of each farm.
+
+<br>
+
+For mapping the South African distribution of *Haliotis Midae*, I used [iNaturalist](https://www.inaturalist.org/) to extract observations. These observations were then used to create a map which gives insight into the distribution of *Haliotis midae*.
+
+### <br> **My goal is to create a distribution map from observations.** <br>
+
+There are two primary packages I needed to extract [iNaturalist](https://www.inaturalist.org/) data and then map data. These are the packages:
+
+-   sf
+
+-    rinat.
+
+-   'Sf' is a simple function package for r that allows for a simple way to use and work with spatial data in R.
+
+-   Rinat is a package that links R and [iNaturalist](https://www.inaturalist.org/) data Through APIs. This package was developed by [rOpenSci](https://ropensci.org/).
+
+```{r datasets, echo = T, warning=F, message=F}
+#install sf package
+library(sf)
+
+#install the rinat package to extract off iNaturalist
+library(rinat)
+
+```
+
+<br>
+
+#### I can view the functions of sf using **methods().**
+
+<br>
+
+```{r}
+methods(class = 'sf')
+```
+
+<br>
+
+<br>
+
+## Plotting my geographical map.
+
+<br>
+
+#### Step 1.1 - Download the plotting packages.
+
+For the purpose of plotting the basic map I need two other basic packages:
+
+-   ggplot2
+
+-   dplyr
+
+    <br>
+
+```{r datasets2, echo = T, warning=F, message=F}
+#use dplyr
+library(dplyr)
+
+#use ggplot2
+library(ggplot2)
+```
+
+<br>
+
+#### Step 1.2 - extract observation data.
+
+The next step is to extract observation data out of [iNaturalist](https://www.inaturalist.org/) for the observations of the Perlemoen *(Haliotis midae)*.
+
+I also need to set the bounds of the distribution of Perlemoen and limit the number of observations.
+
+<br>
+
+```{r}
+#Call the data directly from iNat and set bounds of map and limit obs
+pc <- get_inat_obs(taxon_name = "Haliotis midae",
+                   bounds = c(-90, 10 , -10, 60),
+                   maxresults = 1000)
+```
+
+<br> There were less than 1000 observations and all of them occurred between the southern west coast and just past East London. Due to the limited number of observations, I set the bounds extremely wide to make sure all observations were captured.
+
+The output bounds were predetermined by R due to the limited range. <br>
+
+I then previewed the data using **head()** so that I could filter the returned observations by a range of column attribute criteria.
+
+<br>
+
+```{r}
+head(pc)
+
+#Filter returned observations by a range of column attribute criteria
+pc <- pc %>% filter(positional_accuracy<46 & 
+                      latitude<0 &
+                      !is.na(latitude) &
+                      captive_cultivated == "false" &
+                      quality_grade == "research")
+
+class(pc)
+```
+
+<br>
+
+#### Step 1.3 - Create a data frame.
+
+<br> Now that the observations have been filtered, a data frame can then be created for spatial reference. <br>
+
+```{r}
+#Make the dataframe a spatial object of class = "sf"
+pc <- st_as_sf(pc, coords = c("longitude", "latitude"), crs = 4326)
+```
+
+<br> I can now look at the names of my new geometry column and plot the geographical locations of the observations from my spatial data frame. <br>
+
+```{r}
+names(pc)
+
+```
+
+<br>
+
+#### Step 1.4- Create the plot.
+
+##### Geographical referenced Plot.
+
+<br>
+
+below is the plot of the observations in coordinate space. I can see that it is taking on the shape of the South African Coast:
+
+```{r pressure, echo=TRUE}
+ggplot() + geom_sf(data=pc)
+```
+
+#### Step 1.5- Adding a basemap to my plot.
+
+##### Tiles were pulled using Open Street Map so I could plot my points over a basemap. 
+
+New packages used:
+
+-   rosm
+
+-   ggspatial
+
+```{r datasets3, echo = T, warning=F, message=F}
+#use package rosm
+library(rosm)
+
+
+#use package ggspatial
+library(ggspatial)
+
+
+```
+
+<br>
+
+Now that the packages have been called, I can add the basemap to my plot.
+
+<br>
+
+#### The output 
+
+```{r baselayer, echo=TRUE}
+#add a baselayer from open street maps
+
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=pc)
+```
+
+Looking at the map, I can see that the distribution of *Haliotis midae* only occurs along the coast of South Africa, which is expected.
+
+The distribution only goes as far north as East London, which is also expected. The Perlemoen has a low temperature tolerance and doesn't occur in water temperatures much higher than 18 degrees Celsius. The optimal temperature range for the Perlemoen is between 10 and 15 degrees Celsius.
+
+I would have expected the range to extend slightly further up the west coast, however the map is only recording the logged observations from iNaturalist.
+
+Although the number of observations is limited, the general pattern for distribution holds true. Perlemoen are generally only found in higher densities along the Western and Southern coast, in their optimal temperature range.
+
+Abalone are also limited by food availability. Their diet mainly consists of Kelp which occurs in high densities on the western and southern coast.
+
+<br>
+
+## Adding colour and labels to my plot.
+
+##### The previous plot gives the basic pattern but without any context. 
+
+##### To improve the map I will add a bit of colour and a label for context.
+
+<br>
+
+#### Step 2.1 - group the variable.
+
+##### **Before I add colour I need to specify what needs colour.**
+
+<br>
+
+For this I need to group the abalone by their **common_name** so that I have an object to add colour to:
+
+<br>
+
+```{r}
+pc %>% group_by(common_name) %>% summarise(n())
+```
+
+<br>
+
+#### step 2.2 - create a colour palette.
+
+##### To choose colour, I will create a colour palette using the package wesanderson.
+
+```{r datasets4, echo = T, warning=F, message=F}
+# Install package wesanderson
+library(wesanderson)
+```
+
+<br>
+
+The colour palette I will use is called **BottleRocket1**, which is one of the palettes available in the package.
+
+```{r}
+pal <- wes_palette("BottleRocket1", 1, type = "continuous")
+```
+
+<br>
+
+#### Step 2.3 - update the plot.
+
+Now that I have created a colour palette and grouped *Haliotis midae* by their common name, I can add the colour to my points and add a colour coded label.
+
+```{r colour, echo=TRUE}
+#add a baselayer from open street maps
+
+ggplot() + 
+  annotation_map_tile(type = "osm", progress = "none") + 
+  geom_sf(data=pc, aes(col = common_name)) +
+  scale_colour_manual(values = pal)
+
+
+```
+
+## Interactive plot
+
+##### **Now that I have created a distribution map of *Haliotis midae,* I want to create an interactive plot which may be useful for my honours project.**
+
+<br>
+
+The abalone aquaculture industry is growing rapidly and there are a number of successful abalone farms in South Africa. Most of these farms take their breeding stock out of the ocean for genetic diversity.
+
+Creating an interactive map may help prospective farmers to view where higher density of abalone exist along the coastline.
+
+This will help prospective farmers to scout out land next to the coastline and the native stock of abalone along that coastline, to potentially create a new abalone farm.
+
+<br>
+
+#### Step 3.1 - download interactive packages.
+
+##### To create and interactive plot I need two packages:
+
+-   leaflet
+
+-   htmltools
+
+These packages assist in creating an interactive map.
+
+The [leaflet](https://leafletjs.com/) mapserver uses wrapper functions in the [leaflet R package](https://rstudio.github.io/leaflet/) written for this purpose.
+
+```{r datasets5, echo = T, warning=F, message=F}
+#download package leaflet
+library(leaflet)
+
+#download package htmltool
+library(htmltools)
+
+```
+
+<br>
+
+#### Step 3.2 - Add a map tile and plot the interactive map.
+
+##### I can then add the default OpenStreetMap  map tile and add my points onto this map tile.
+
+<br>
+
+```{r interactive, echo=TRUE}
+
+leaflet() %>%
+  # Add default OpenStreetMap map tiles
+  addTiles(group = "Default") %>%  
+  # Add points and change radius and colour
+  addCircleMarkers(data = pc,
+                   group = "Haliotis midae",
+                   radius = 7, 
+                   color = "red")
+```
+
+<br>
+
+<br>
+
+I enlarged the radius of my points on the interactive map to try and show the distribution rather than the point observation.
+
+This map should hopefully assist prospective farmers to identify good locations for abalone farms.
+
+<br>
+
+#### Conclusion
+
+I have enjoyed learning the application of GIS and the power it holds in biological sciences. My actual project won't require any GIS because it is an aquaculture based project based on a single locality.
+
+The maps I have created in my project may help in my project, by creating a visual reference to the extent and potential of abalone aquaculture in South Africa.
